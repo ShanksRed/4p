@@ -1,0 +1,37 @@
+#include "stdafx.h"
+#include <iostream>
+#include <math.h>
+#include <iomanip>
+#include <fstream> 
+#include <stdio.h>
+#include <cstdlib>
+#include <vector>
+
+using namespace std;
+float PI = 3.14159265358979323846;
+//поверхность контактов
+float ContactSurf(int r,float R0) {
+	return 4 *PI*(r + R0);
+}
+//число ячеек в слое L
+float NumbCell(int r, float R0) {
+	return 4 / 3 * PI*(3 * pow((r + R0), 2) - 3 * (r + R0) + 1);
+}
+
+int main()
+{
+	//setlocale(LC_ALL, "Russian");
+	int N,n,M,v,max_step,numblink;
+	float del=0.1,R0=0.5;
+	ifstream infile("data1.txt");
+	infile >> N >> n >> M >> v >> del>>max_step;//нач. парамертры
+	infile.close();
+	numblink = n*N;//число звеньев
+	vector<int> cell1;
+	vector<int> cell2;
+	cell1.resize(M + 2);
+	cell2.resize(N);
+	
+	return 0;
+}
+
