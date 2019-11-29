@@ -43,14 +43,31 @@ void field(int numblink, int M, int N, float R0, int max_step) {
 	for (int i = 0; i < N; i++)
 		s[i] = 0;
 	float Gp, Gw;
-	vector<float> Gforw {0,0,0};
-	vector < vector <int> > Gforw(M+2, vector <int>(N,0));
+	//vector<float> Gforw{ 0,0,0 };
+	vector < vector <int> > Gforw(M + 2, vector <int>(N, 0));
 	vector < vector <int> > Gback(M + 2, vector <int>(N, 0));
 	for (int i = 0; i < max_step; i++) {
-		for (int j = 1; j < N; j++) {
-			for (int k = 1; k < M + 1; k++) {
+		for (int j = 1; j < N+1; j++) {
+			for (int k = 0; k < M + 2; k++) {
+				probability(&LambdB, &LambdF, &LambdS, curru, R0);
 				Gp = exp(-uP[k]);
 				Gw = exp(-uW[k]);
+				if (k == 0) {
+					Gforw[k][j] = 0;
+					Gback[k][j] = 0;
+				}
+				else if (k == M + 1) {
+					Gforw[k][j] = Gforw[k-1][j];
+					Gback[k][j] = Gback[k-1][j];
+				}
+				else {
+					Gforw[k][j] = Gp;
+					Gback[k][N-j] = Gw;
+					Gforw[k+1][j] = exp(-uP[k+1]);
+					Gback[k+1][N - j] = exp(-uW[k+1]);
+				}
+				Gforw[k][j + 1] = Gp*(LambdB*Gforw[k - 1][j] + LambdS*Gforw[k][j] + LambdF*Gforw[k + 1][j]);
+				Gforw[k][j -1] = Gp*(LambdB*Gback[k - 1][j] + LambdS*Gforw[k][j] + LambdF*Gback[k + 1][j]);
 			}
 		}
 	}
