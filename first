@@ -30,11 +30,17 @@ void probability(float* LambdB, float* LambdF, float* LambdS, int curru, float R
 void field(int numblink, int M, int N, float R0, int max_step) {
 	float LambdB, LambdF, LambdS;//вероятности перехода в сферической геометрии
 	int curru = 0, currs = 1;
+	int r = M + 2;
+	int allS = N;
 	vector<int> uW;//поле полимера
 	vector<int> uP;//поле растворителя
 	vector<int> s; //номер звена
+	vector<int> phiP;
+	vector<int> phiW;
 	uW.resize(M + 2);
 	uP.resize(M + 2);
+	phiP.resize(M + 2);
+	phiW.resize(M + 2);
 	s.resize(N);
 	for (int i = 0; i < M + 2; i++) {
 		uW[i] = 0;
@@ -42,35 +48,62 @@ void field(int numblink, int M, int N, float R0, int max_step) {
 	}
 	for (int i = 0; i < N; i++)
 		s[i] = 0;
-	float Gp, Gw;
 	//vector<float> Gforw{ 0,0,0 };
 	vector < vector <int> > Gforw(M + 2, vector <int>(N, 0));
 	vector < vector <int> > Gback(M + 2, vector <int>(N, 0));
+	vector<int> Gp;//Вероятность нахождения 
+	vector<int> Gw;//в слое
+
 	for (int i = 0; i < max_step; i++) {
-		for (int j = 1; j < N+1; j++) {
-			for (int k = 0; k < M + 2; k++) {
+		for (int c = 0; c < r; c++) {
+			Gp[c] = exp(-uP[c]); Gw[c] = exp(-uW[c]);
+		}
+		for (int j = 1; j < N + 1; j++) {
+			
+			Gforw[0][j] = 0;
+			Gback[0][j] = 0;
+			for (int k = 1; k < M + 2; k++) {
 				probability(&LambdB, &LambdF, &LambdS, curru, R0);
-				Gp = exp(-uP[k]);
-				Gw = exp(-uW[k]);
-				if (k == 0) {
-					Gforw[k][j] = 0;
-					Gback[k][j] = 0;
+				Gforw[k][j] = Gp[k];
+				Gback[k][allS] = Gp[k];
+				int tempR;
+				for (int temp = 1; temp < r-1; temp++) {
+					tempR = temp+1;
+					if (temp == M) tempR = M;
+					Gforw[temp][j + 1] = Gp[temp] * (LambdB*Gforw[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gforw[tempR][j]);
+					
 				}
-				else if (k == M + 1) {
-					Gforw[k][j] = Gforw[k-1][j];
-					Gback[k][j] = Gback[k-1][j];
+				for (int temp = r-1; temp > 1; temp--) {
+					tempR = temp + 1;
+					if (temp == M) tempR = M;
+					Gback[temp][j - 1] = Gp[temp] * (LambdB*Gback[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gback[tempR][j]);
 				}
-				else {
-					Gforw[k][j] = Gp;
-					Gback[k][N-j] = Gw;
-					Gforw[k+1][j] = exp(-uP[k+1]);
-					Gback[k+1][N - j] = exp(-uW[k+1]);
-				}
-				Gforw[k][j + 1] = Gp*(LambdB*Gforw[k - 1][j] + LambdS*Gforw[k][j] + LambdF*Gforw[k + 1][j]);
-				Gforw[k][j -1] = Gp*(LambdB*Gback[k - 1][j] + LambdS*Gforw[k][j] + LambdF*Gback[k + 1][j]);
+
+				
+				
 			}
 		}
+		float q=1;
+		for (int tempr = 0; tempr < M + 2; tempr++) {
+			q *= NumbCell(i, R0);
+			float tempSumm=0;
+			for (int temps = 0; temps < N+1; temps++) {
+				tempSumm += (Gforw[tempr][temps] * Gback[tempr][temps]) / Gp[tempr];
+			}
+			q *= tempSumm;
+		}
+		for (int tempr = 0; tempr < M + 2; tempr++) {
+			float tempSumm = 0;
+			for (int temps = 0; temps < N + 1; temps++) {
+				tempSumm += (Gforw[tempr][temps] * Gback[tempr][temps]) / Gp[tempr];
+			}
+			phiP[tempr] = (numblink / q)*tempSumm;
+			phiW[tempr] = Gw[tempr];
+		}
+
+
 	}
+
 }
 
 
@@ -93,3 +126,42 @@ int main()
 
 	return 0;
 }
+
+
+
+
+
+
+
+
+/*Gp = exp(-uP[k]);
+				Gw = exp(-uW[k]);
+				if (k == 0) {
+					Gforw[k][j] = 0;
+					Gback[k][j] = 0;
+				}
+				else if (k == M + 1) {
+					Gforw[k][j] = Gforw[k - 1][j];
+					Gback[k][j] = Gback[k - 1][j];
+				}
+				else {
+					Gforw[k][j] = Gp;
+					Gback[k][N - j] = Gw;
+					Gforw[k + 1][j] = exp(-uP[k + 1]);
+					Gback[k + 1][N - j] = exp(-uW[k + 1]);
+				}
+				Gforw[k][j + 1] = Gp*(LambdB*Gforw[k - 1][j] + LambdS*Gforw[k][j] + LambdF*Gforw[k + 1][j]);
+				Gforw[k][j - 1] = Gp*(LambdB*Gback[k - 1][j] + LambdS*Gforw[k][j] + LambdF*Gback[k + 1][j]);
+				
+						if (k == M + 1) {
+					Gforw[k][j] = Gforw[k - 1][j]; 
+					Gback[k][j] = Gback[k - 1][j];
+				}
+				
+				
+				
+				
+				
+				
+				
+				*/
