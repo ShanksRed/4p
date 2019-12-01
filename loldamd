@@ -1,0 +1,180 @@
+# 4p#include "stdafx.h"
+#include <iostream>
+#include <math.h>
+#include <iomanip>
+#include <fstream> 
+#include <stdio.h>
+#include <cstdlib>
+#include <vector>
+
+using namespace std;
+float PI = 3.14159265358979323846;
+//поверхность контактов(A)
+float ContactSurf(int r, float R0) {
+	return 4 * PI*(r + R0);
+}
+//число ячеек в слое L
+float NumbCell(int r, float R0) {
+	return 4 / 3 * PI*(3 * pow((r + R0), 2) - 3 * (r + R0) + 1);
+}
+
+void probability(float* LambdB, float* LambdF, float* LambdS, int curru, float R0) {
+	float tempLambdB, tempLambdF, tempLambdS;
+	tempLambdB = tempLambdF = 1 / 6;
+	tempLambdS = 1 - tempLambdB - tempLambdF;//вероятности перехода в плойской геометрии
+	*LambdF = tempLambdF*(ContactSurf(curru, R0) / NumbCell(curru, R0));
+	*LambdB = tempLambdB*(ContactSurf(curru - 1, R0) / NumbCell(curru, R0));
+	*LambdS = 1 - *LambdF - *LambdB;
+}
+
+void field(int numblink, int M, int N, float R0, int max_step, float n, float del) {
+	float LambdB, LambdF, LambdS, err = 0;//вероятности перехода в сферической геометрии
+	int curru = 0, currs = 1;
+	int r = M + 2;
+	int allS = N+1;
+	vector<int> uW;//поле полимера
+	vector<int> uP;//поле растворителя
+	vector<int> s; //номер звена
+	vector<int> phiP;
+	vector<int> phiW;
+	vector<int> alpha;
+	uW.resize(M + 2);
+	alpha.resize(M + 2);
+	uP.resize(M + 2);
+	phiP.resize(M + 2);
+	phiW.resize(M + 2);
+	s.resize(N);
+	for (int i = 0; i < M + 2; i++) {
+		uW[i] = 0;
+		alpha[i] = 0;
+		uP[i] = 0;
+	}
+	for (int i = 0; i < N; i++)
+		s[i] = 0;
+	//vector<float> Gforw{ 0,0,0 };
+	vector < vector <int> > Gforw(M + 2, vector <int>(N, 0));
+	vector < vector <int> > Gback(M + 2, vector <int>(N, 0));
+	vector<int> Gp;//Вероятность нахождения 
+	vector<int> Gw;//в слое
+
+	for (int i = 0; i < max_step; i++) {
+		for (int c = 0; c < r; c++) {
+			Gp[c] = exp(-uP[c]); Gw[c] = exp(-uW[c]);
+		}
+		Gforw[1][1] = Gp[1];//начальное положение шарика
+		Gback[1][allS - 1] = Gp[1];
+		for (int j = 1; j < N + 1; j++) {
+
+			Gforw[0][j] = 0;
+			Gback[0][j] = 0;
+			for (int k = 1; k < r; k++) {
+				probability(&LambdB, &LambdF, &LambdS, curru, R0);
+				int tempR;
+				for (int temp = 1; temp < r - 1; temp++) {
+					tempR = temp + 1;
+					if (temp == M) tempR = M;
+					Gforw[temp][j + 1] = Gp[temp] * (LambdB*Gforw[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gforw[tempR][j]);
+
+				}
+				for (int temp = r - 1; temp > 1; temp--) {
+					tempR = temp + 1;
+					if (temp == M) tempR = M;
+					Gback[temp][j - 1] = Gp[temp] * (LambdB*Gback[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gback[tempR][j]);
+				}
+
+
+
+			}
+		}
+		float q = 1;
+		for (int tempr = 0; tempr < M + 2; tempr++) {
+			q *= NumbCell(i, R0);
+			float tempSumm = 0;
+			for (int temps = 0; temps < N + 1; temps++) {
+				tempSumm += (Gforw[tempr][temps] * Gback[tempr][temps]) / Gp[tempr];
+			}
+			q *= tempSumm;
+		}
+		for (int tempr = 0; tempr < M + 2; tempr++) {
+			float tempSumm = 0;
+			for (int temps = 0; temps < N + 1; temps++) {
+				tempSumm += (Gforw[tempr][temps] * Gback[tempr][temps]) / Gp[tempr];
+			}
+			phiP[tempr] = (numblink / q)*tempSumm;
+			phiW[tempr] = Gw[tempr];
+		}
+
+		for (int tempr = 0; tempr < r; tempr++)
+			alpha[tempr] = alpha[tempr] + n*(phiP[tempr] + phiW[tempr] - 1);
+
+		for (int tempr = 0; tempr < r; tempr++) {
+			uP[tempr] = alpha[tempr];
+			uW[tempr] = alpha[tempr];
+		}
+		for (int tempr = 0; tempr < r; tempr++) {
+			err += pow(phiP[tempr] + phiW[tempr] - 1, 2);
+		}
+		if (sqrt(err) < del) break;
+	}
+
+}
+
+
+
+
+
+int main()
+{
+	//setlocale(LC_ALL, "Russian");
+	int N, n, M, v, max_step, numblink;
+	float del = 0.1, R0 = 0.5;
+	ifstream infile("data1.txt");
+	infile >> N >> n >> M >> v >> del >> max_step;//нач. парамертры
+	infile.close();
+	numblink = n*N;//число звеньев
+	vector<int> cell1;
+	vector<int> cell2;
+	cell1.resize(M + 2);
+	cell2.resize(N);
+	field(numblink, M, N, R0, max_step, v, del);
+	return 0;
+}
+
+
+
+
+
+
+
+
+/*Gp = exp(-uP[k]);
+Gw = exp(-uW[k]);
+if (k == 0) {
+Gforw[k][j] = 0;
+Gback[k][j] = 0;
+}
+else if (k == M + 1) {
+Gforw[k][j] = Gforw[k - 1][j];
+Gback[k][j] = Gback[k - 1][j];
+}
+else {
+Gforw[k][j] = Gp;
+Gback[k][N - j] = Gw;
+Gforw[k + 1][j] = exp(-uP[k + 1]);
+Gback[k + 1][N - j] = exp(-uW[k + 1]);
+}
+Gforw[k][j + 1] = Gp*(LambdB*Gforw[k - 1][j] + LambdS*Gforw[k][j] + LambdF*Gforw[k + 1][j]);
+Gforw[k][j - 1] = Gp*(LambdB*Gback[k - 1][j] + LambdS*Gforw[k][j] + LambdF*Gback[k + 1][j]);
+
+if (k == M + 1) {
+Gforw[k][j] = Gforw[k - 1][j];
+Gback[k][j] = Gback[k - 1][j];
+}
+
+
+
+
+
+
+
+*/
