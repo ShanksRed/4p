@@ -1,4 +1,4 @@
-# 4p#include "stdafx.h"
+#include "stdafx.h"
 #include <iostream>
 #include <math.h>
 #include <iomanip>
@@ -31,7 +31,7 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 	float LambdB, LambdF, LambdS, err = 0;//вероятности перехода в сферической геометрии
 	int curru = 0, currs = 1;
 	int r = M + 2;
-	int allS = N+1;
+	int allS = N + 1;
 	vector<int> uW;//поле полимера
 	vector<int> uP;//поле растворителя
 	vector<int> s; //номер звена
@@ -126,8 +126,8 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 int main()
 {
 	//setlocale(LC_ALL, "Russian");
-	int N, n, M, v, max_step, numblink;
-	float del = 0.1, R0 = 0.5;
+	int N, n, M, max_step, numblink;
+	float del = 0.1, R0 = 0.5,v;
 	ifstream infile("data1.txt");
 	infile >> N >> n >> M >> v >> del >> max_step;//нач. парамертры
 	infile.close();
