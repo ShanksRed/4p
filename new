@@ -27,7 +27,7 @@ void probability(float* LambdB, float* LambdF, float* LambdS, int curru, float R
 	*LambdS = 1 - *LambdF - *LambdB;
 }
 
-void output(int r, vector<int>& phiW, vector<int>& phiP, vector<int>&alpha) {
+void output(int r, vector<float>& phiW, vector<float>& phiP, vector<float>&alpha) {
 	FILE *hfile;
 	if (r == 0) {
 		hfile = fopen("out.txt", "w");
@@ -36,6 +36,7 @@ void output(int r, vector<int>& phiW, vector<int>& phiP, vector<int>&alpha) {
 		hfile = fopen("out.txt", "a");
 	}
 	//запись радиусов в файл
+	float temp1=phiP,
 	fprintf(hfile, " %4d %8.3f %8.3f \n", t, Rg, Rce);
 	fclose(hfile);
 }
@@ -50,11 +51,11 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 	int r = M + 2;
 	int allS = N + 1;
 	vector<float> uW;//поле полимера
-	vector<int> uP;//поле растворителя
+	vector<float> uP;//поле растворителя
 	vector<int> s; //номер звена
-	vector<int> phiP;
-	vector<int> phiW;
-	vector<int> alpha;
+	vector<float> phiP;
+	vector<float> phiW;
+	vector<float> alpha;
 	uW.resize(M + 2);
 	alpha.resize(M + 2);
 	uP.resize(M + 2);
@@ -69,9 +70,9 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 	for (int i = 0; i < N; i++)
 		s[i] = 0;
 	//vector<float> Gforw{ 0,0,0 };
-	vector < vector <int> > Gforw(M + 2, vector <int>(N+1, 0));
-	vector < vector <int> > Gback(M + 2, vector <int>(N+1, 0));
-	vector<int> Gp;//Вероятность нахождения 
+	vector < vector <float> > Gforw(M + 2, vector <float>(N+1, 0));
+	vector < vector <float> > Gback(M + 2, vector <float>(N+1, 0));
+	vector<float> Gp;//Вероятность нахождения 
 	vector<int> Gw;//в слое
 	Gp.resize(M + 2);
 	Gw.resize(M + 2);
