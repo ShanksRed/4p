@@ -1,0 +1,186 @@
+#include "stdafx.h"
+#include <iostream>
+#include <math.h>
+#include <iomanip>
+#include <fstream> 
+#include <stdio.h>
+#include <cstdlib>
+#include <vector>
+
+using namespace std;
+float PI = 3.14159265358979323846;
+//поверхность контактов(A)
+float ContactSurf(int r, float R0) {
+	return 4 * PI*pow((r + R0),2);
+}
+//число ячеек в слое L
+float NumbCell(int r, float R0) {
+	return 4 / 3 * PI*(3 * pow((r + R0), 2) - 3 * (r + R0) + 1);
+}
+
+void probability(float* LambdB, float* LambdF, float* LambdS, int curru, float R0) {
+	float tempLambdB, tempLambdF, tempLambdS;
+	tempLambdF =1.0/6;
+	tempLambdB = 1.0 / 6;
+	tempLambdS = 1 - tempLambdB - tempLambdF;//вероятности перехода в плойской геометрии
+	*LambdF = tempLambdF*(ContactSurf(curru, R0) / NumbCell(curru, R0));
+	*LambdB = tempLambdB*(ContactSurf(curru - 1, R0) / NumbCell(curru, R0));
+	*LambdS = 1 - *LambdF - *LambdB;
+}
+
+void output(int r, vector<float>& phiW, vector<float>& phiP, vector<float>&alpha) {
+	FILE *hfile;
+	if (r == 0) {
+		hfile = fopen("out.txt", "w");
+	}
+	else {
+		hfile = fopen("out.txt", "a");
+	}
+	//запись радиусов в файл
+	//int size = phiW.size();
+	//float temp1 = phiP,
+	fprintf(hfile, " %4d %8.3f %8.3f %8.3f \n", r, phiP[r], phiW[r], alpha[r]);
+	fclose(hfile);
+}
+
+
+
+
+
+void field(int numblink, int M, int N, float R0, int max_step, float n, float del) {
+	float LambdB, LambdF, LambdS, err = 0, F, multy1 = 0, multy2 = 0, Rg, Fel, Fint=0;//вероятности перехода в сферической геометрии
+	int r = M + 2;
+	int allS = N + 1;
+	vector<float> uW;//поле полимера
+	vector<float> uP;//поле растворителя
+	vector<float> phiP;
+	vector<float> phiW;
+	vector<float> alpha;
+	uW.resize(M + 2);
+	alpha.resize(M + 2);
+	uP.resize(M + 2);
+	phiP.resize(M + 2);
+	phiW.resize(M + 2);
+	for (int i = 0; i < M + 2; i++) {
+		uW[i] = 0;
+		alpha[i] = 0;
+		uP[i] = 0;
+	}
+	//vector<float> Gforw{ 0,0,0 };
+	vector < vector <float> > Gforw(M + 2, vector <float>(N + 1, 0));
+	vector < vector <float> > Gback(M + 2, vector <float>(N + 1, 0));
+	vector<float> Gp;//Вероятность нахождения 
+	vector<float> Gw;//в слое
+	Gp.resize(M + 2);
+	Gw.resize(M + 2);
+
+	for (int i = 0; i < max_step; i++) {
+		for (int c = 0; c < r; c++) {
+			Gp[c] = exp(-uP[c]); Gw[c] = exp(-uW[c]);
+		}
+		Gforw[1][1] = Gp[1];//начальное положение шарика
+		Gback[M][N] = Gp[M];
+		for (int j = 1; j < N; j++) {
+
+			Gforw[0][j] = 0;
+			Gback[0][j] = 0;
+			int tempR;
+			for (int temp = 1; temp < r - 1; temp++) {
+				probability(&LambdB, &LambdF, &LambdS, temp, R0);
+				tempR = temp + 1;
+				if (temp == M ) tempR = M;
+				Gforw[temp][j + 1] = Gp[temp] * (LambdB*Gforw[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gforw[tempR][j]);
+				//	cout << Gforw[temp][j + 1] << " ";
+			}
+			//cout << endl;
+			for (int temp = r - 2; temp > 0; temp--) {
+				probability(&LambdB, &LambdF, &LambdS, temp, R0);
+				tempR = temp + 1;
+				if (temp == M) tempR = M;
+				Gback[temp][j - 1] = Gp[temp] * (LambdB*Gback[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gback[tempR][j]);
+				//	cout << Gforw[temp][j + 1] << " ";
+			}
+			//cout << endl;
+		}
+		/*
+		for (int tt = 0; tt < r; tt++) {
+		for (int temp3 = 0; temp3 < N+1; temp3++) {
+		cout << Gback[tt][temp3] << " ";
+		}
+		cout << endl;
+		}
+	//	*/
+		float q = 0;
+		//ищем стат.сумму цепи
+		for (int tempr = 0; tempr < M + 2; tempr++) {
+			float tempSumm = 0;
+			for (int temps = 1; temps < N + 1; temps++) {
+				tempSumm += (Gforw[tempr][temps] * Gback[tempr][temps]) / Gp[tempr];
+			}
+			tempSumm *= NumbCell(tempr, R0);
+			q += tempSumm;
+		}
+		//	cout << q;
+		//Рассчитываем профили плотности полимера и растворителя
+		for (int tempr = 0; tempr < M + 2; tempr++) {
+			float tempSumm = 0;
+			for (int temps = 1; temps < N + 1; temps++) {
+				tempSumm += (Gforw[tempr][temps] * Gback[tempr][temps]) / Gp[tempr];
+			}
+			phiP[tempr] = (numblink / q)*tempSumm;
+			phiW[tempr] = Gw[tempr];
+			//cout << phiP[tempr] << " " << phiW[tempr];
+		}
+		//Рассчитываем поле Лагранжа
+		for (int tempr = 0; tempr < r; tempr++)
+			alpha[tempr] = alpha[tempr] + n*(phiP[tempr] + phiW[tempr] - 1);
+		//обновляем поля
+		for (int tempr = 0; tempr < r; tempr++) {
+			uP[tempr] = alpha[tempr];
+			uW[tempr] = alpha[tempr];
+			//	cout << uP[tempr] << " " << uW[tempr];
+		}
+		//условие выхода из цикла
+		for (int tempr = 0; tempr < r; tempr++) {
+			output(tempr, phiW, phiP, alpha);//выводим информацию в файл
+			err += pow(phiP[tempr] + phiW[tempr] - 1, 2);
+		}
+		//радиус инерции
+		for (int tempr = 0; tempr < r; tempr++) {
+			multy1 += phiP[tempr] * NumbCell(tempr, R0)*pow(tempr, 2);
+			multy2 += phiP[tempr] * NumbCell(tempr, R0);
+		}
+		Rg = sqrt(multy1 / multy2);
+		cout << "radius iner:" << Rg<<"  ";
+		//ищем Cвободную энергию
+		Fel = (-numblink / N)*log(numblink / q);
+		for (int tempr = 0; tempr < r; tempr++) {
+			Fint += (uP[tempr] * phiP[tempr] + uW[tempr] * phiW[tempr])* NumbCell(tempr, R0);
+		}
+		cout << "free energy:" << Fel-Fint<<endl;
+		if (sqrt(err) < del) break;
+	}
+
+}
+
+
+
+
+
+int main()
+{
+	//setlocale(LC_ALL, "Russian");
+	int N, n, M, max_step, numblink;
+	float del = 0.1, R0 = 0.5, v;
+	ifstream infile("data1.txt");
+	infile >> N >> n >> M >> v >> del >> max_step;//нач. парамертры
+	infile.close();
+	numblink = n*N;//число звеньев
+	vector<int> cell1;
+	vector<int> cell2;
+	cell1.resize(M + 2);
+	cell2.resize(N);
+	field(numblink, M, N, R0, max_step, v, del);
+	return 0;
+}
+
