@@ -11,7 +11,7 @@ using namespace std;
 float PI = 3.14159265358979323846;
 //поверхность контактов(A)
 float ContactSurf(int r, float R0) {
-	return 4 * PI*(r + R0);
+	return 4 * PI*pow((r + R0),2);
 }
 //число ячеек в слое L
 float NumbCell(int r, float R0) {
@@ -38,7 +38,7 @@ void output(int r, vector<float>& phiW, vector<float>& phiP, vector<float>&alpha
 	//запись радиусов в файл
 	//int size = phiW.size();
 	//float temp1 = phiP,
-		fprintf(hfile, " %4d %8.3f %8.3f %8.3f \n", r, phiP[r], phiW[r],alpha[r]);
+	fprintf(hfile, " %4d %8.3f %8.3f %8.3f \n", r, phiP[r], phiW[r], alpha[r]);
 	fclose(hfile);
 }
 
@@ -47,7 +47,7 @@ void output(int r, vector<float>& phiW, vector<float>& phiP, vector<float>&alpha
 
 
 void field(int numblink, int M, int N, float R0, int max_step, float n, float del) {
-	float LambdB, LambdF, LambdS, err = 0,F, multy1 = 0, multy2 = 0, Rg,Fel,Fint;//вероятности перехода в сферической геометрии
+	float LambdB, LambdF, LambdS, err = 0, F, multy1 = 0, multy2 = 0, Rg, Fel, Fint=0;//вероятности перехода в сферической геометрии
 	int curru = 0, currs = 1;
 	int r = M + 2;
 	int allS = N + 1;
@@ -95,7 +95,7 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 				tempR = temp + 1;
 				if (temp == M + 1) tempR = M;
 				Gforw[temp][j + 1] = Gp[temp] * (LambdB*Gforw[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gforw[tempR][j]);
-			//	cout << Gforw[temp][j + 1] << " ";
+				//	cout << Gforw[temp][j + 1] << " ";
 			}
 			//cout << endl;
 			for (int temp = r - 2; temp > 0; temp--) {
@@ -103,7 +103,7 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 				tempR = temp + 1;
 				if (temp == M) tempR = M;
 				Gback[temp][j - 1] = Gp[temp] * (LambdB*Gback[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gback[tempR][j]);
-			//	cout << Gforw[temp][j + 1] << " ";
+				//	cout << Gforw[temp][j + 1] << " ";
 			}
 			//cout << endl;
 
@@ -112,10 +112,10 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 		}
 		/*
 		for (int tt = 0; tt < r; tt++) {
-			for (int temp3 = 0; temp3 < N+1; temp3++) {
-				cout << Gback[tt][temp3] << " ";
-			}
-			cout << endl;
+		for (int temp3 = 0; temp3 < N+1; temp3++) {
+		cout << Gback[tt][temp3] << " ";
+		}
+		cout << endl;
 		}
 		*/
 		float q = 0;
@@ -127,7 +127,7 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 			tempSumm *= NumbCell(tempr, R0);
 			q += tempSumm;
 		}
-	//	cout << q;
+		//	cout << q;
 		for (int tempr = 0; tempr < M + 2; tempr++) {
 			float tempSumm = 0;
 			for (int temps = 0; temps < N + 1; temps++) {
@@ -135,7 +135,7 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 			}
 			phiP[tempr] = (numblink / q)*tempSumm;
 			phiW[tempr] = Gw[tempr];
-			cout << phiP[tempr] << " " << phiW[tempr];
+			//cout << phiP[tempr] << " " << phiW[tempr];
 		}
 
 		for (int tempr = 0; tempr < r; tempr++)
@@ -144,10 +144,10 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 		for (int tempr = 0; tempr < r; tempr++) {
 			uP[tempr] = alpha[tempr];
 			uW[tempr] = alpha[tempr];
-		//	cout << uP[tempr] << " " << uW[tempr];
+			//	cout << uP[tempr] << " " << uW[tempr];
 		}
 		for (int tempr = 0; tempr < r; tempr++) {
-			output(tempr, phiW, phiP,alpha);
+			output(tempr, phiW, phiP, alpha);
 			err += pow(phiP[tempr] + phiW[tempr] - 1, 2);
 		}
 		//радиус инерции
@@ -156,9 +156,12 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 			multy2 += phiP[tempr] * NumbCell(tempr, R0);
 		}
 		Rg = sqrt(multy1 / multy2);
-		cout << "радиус инерцции:" << Rg;
+		cout << "radius iner:" << Rg<<"  ";
 		Fel = (-numblink / N)*log(numblink / q);
-
+		for (int tempr = 0; tempr < r; tempr++) {
+			Fint += (uP[tempr] * phiP[tempr] + uW[tempr] * phiW[tempr])* NumbCell(tempr, R0);
+		}
+		cout << "free energy:" << Fel-Fint<<endl;
 		if (sqrt(err) < del) break;
 	}
 
@@ -184,7 +187,4 @@ int main()
 	field(numblink, M, N, R0, max_step, v, del);
 	return 0;
 }
-
-
-
 
