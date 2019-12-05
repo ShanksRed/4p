@@ -20,7 +20,8 @@ float NumbCell(int r, float R0) {
 
 void probability(float* LambdB, float* LambdF, float* LambdS, int curru, float R0) {
 	float tempLambdB, tempLambdF, tempLambdS;
-	tempLambdB = tempLambdF = 1 / 6;
+	tempLambdF =1.0/6;
+	tempLambdB = 1.0 / 6;
 	tempLambdS = 1 - tempLambdB - tempLambdF;//вероятности перехода в плойской геометрии
 	*LambdF = tempLambdF*(ContactSurf(curru, R0) / NumbCell(curru, R0));
 	*LambdB = tempLambdB*(ContactSurf(curru - 1, R0) / NumbCell(curru, R0));
@@ -53,7 +54,6 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 	int allS = N + 1;
 	vector<float> uW;//поле полимера
 	vector<float> uP;//поле растворителя
-	vector<int> s; //номер звена
 	vector<float> phiP;
 	vector<float> phiW;
 	vector<float> alpha;
@@ -62,14 +62,11 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 	uP.resize(M + 2);
 	phiP.resize(M + 2);
 	phiW.resize(M + 2);
-	s.resize(N);
 	for (int i = 0; i < M + 2; i++) {
 		uW[i] = 0;
 		alpha[i] = 0;
 		uP[i] = 0;
 	}
-	for (int i = 0; i < N; i++)
-		s[i] = 0;
 	//vector<float> Gforw{ 0,0,0 };
 	vector < vector <float> > Gforw(M + 2, vector <float>(N + 1, 0));
 	vector < vector <float> > Gback(M + 2, vector <float>(N + 1, 0));
@@ -90,10 +87,10 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 			Gback[0][j] = 0;
 			//for (int k = 1; k < r-1; k++) {
 			int tempR;
-			for (int temp = 1; temp < r - 2; temp++) {
+			for (int temp = 1; temp < r - 1; temp++) {
 				probability(&LambdB, &LambdF, &LambdS, temp, R0);
 				tempR = temp + 1;
-				if (temp == M + 1) tempR = M;
+				if (temp == M ) tempR = M;
 				Gforw[temp][j + 1] = Gp[temp] * (LambdB*Gforw[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gforw[tempR][j]);
 				//	cout << Gforw[temp][j + 1] << " ";
 			}
@@ -117,8 +114,9 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 		}
 		cout << endl;
 		}
-		*/
+	//	*/
 		float q = 0;
+		//ищем стат.сумму цепи
 		for (int tempr = 0; tempr < M + 2; tempr++) {
 			float tempSumm = 0;
 			for (int temps = 0; temps < N + 1; temps++) {
@@ -128,6 +126,7 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 			q += tempSumm;
 		}
 		//	cout << q;
+		//Рассчитываем профили плотности полимера и растворителя
 		for (int tempr = 0; tempr < M + 2; tempr++) {
 			float tempSumm = 0;
 			for (int temps = 0; temps < N + 1; temps++) {
@@ -137,15 +136,16 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 			phiW[tempr] = Gw[tempr];
 			//cout << phiP[tempr] << " " << phiW[tempr];
 		}
-
+		//Рассчитываем поле Лагранжа
 		for (int tempr = 0; tempr < r; tempr++)
 			alpha[tempr] = alpha[tempr] + n*(phiP[tempr] + phiW[tempr] - 1);
-
+		//обновляем поля
 		for (int tempr = 0; tempr < r; tempr++) {
 			uP[tempr] = alpha[tempr];
 			uW[tempr] = alpha[tempr];
 			//	cout << uP[tempr] << " " << uW[tempr];
 		}
+		//условие выхода из цикла
 		for (int tempr = 0; tempr < r; tempr++) {
 			output(tempr, phiW, phiP, alpha);
 			err += pow(phiP[tempr] + phiW[tempr] - 1, 2);
@@ -157,6 +157,7 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 		}
 		Rg = sqrt(multy1 / multy2);
 		cout << "radius iner:" << Rg<<"  ";
+		//ищем Cвободную энергию
 		Fel = (-numblink / N)*log(numblink / q);
 		for (int tempr = 0; tempr < r; tempr++) {
 			Fint += (uP[tempr] * phiP[tempr] + uW[tempr] * phiW[tempr])* NumbCell(tempr, R0);
