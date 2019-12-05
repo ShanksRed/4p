@@ -36,8 +36,9 @@ void output(int r, vector<float>& phiW, vector<float>& phiP, vector<float>&alpha
 		hfile = fopen("out.txt", "a");
 	}
 	//запись радиусов в файл
-	float temp1=phiP,
-	fprintf(hfile, " %4d %8.3f %8.3f \n", t, Rg, Rce);
+	//int size = phiW.size();
+	//float temp1 = phiP,
+		fprintf(hfile, " %4d %8.3f %8.3f %8.3f \n", r, phiP[r], phiW[r],alpha[r]);
 	fclose(hfile);
 }
 
@@ -46,7 +47,7 @@ void output(int r, vector<float>& phiW, vector<float>& phiP, vector<float>&alpha
 
 
 void field(int numblink, int M, int N, float R0, int max_step, float n, float del) {
-	float LambdB, LambdF, LambdS, err = 0;//вероятности перехода в сферической геометрии
+	float LambdB, LambdF, LambdS, err = 0,F, multy1 = 0, multy2 = 0, Rg,Fel,Fint;//вероятности перехода в сферической геометрии
 	int curru = 0, currs = 1;
 	int r = M + 2;
 	int allS = N + 1;
@@ -70,8 +71,8 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 	for (int i = 0; i < N; i++)
 		s[i] = 0;
 	//vector<float> Gforw{ 0,0,0 };
-	vector < vector <float> > Gforw(M + 2, vector <float>(N+1, 0));
-	vector < vector <float> > Gback(M + 2, vector <float>(N+1, 0));
+	vector < vector <float> > Gforw(M + 2, vector <float>(N + 1, 0));
+	vector < vector <float> > Gback(M + 2, vector <float>(N + 1, 0));
 	vector<float> Gp;//Вероятность нахождения 
 	vector<int> Gw;//в слое
 	Gp.resize(M + 2);
@@ -83,38 +84,50 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 		}
 		Gforw[1][1] = Gp[1];//начальное положение шарика
 		Gback[1][allS - 1] = Gp[1];
-		for (int j = 1; j < N ; j++) {
+		for (int j = 1; j < N; j++) {
 
 			Gforw[0][j] = 0;
 			Gback[0][j] = 0;
 			//for (int k = 1; k < r-1; k++) {
-				probability(&LambdB, &LambdF, &LambdS, curru, R0);
-				int tempR;
-				for (int temp = 1; temp < r - 2; temp++) {
-					tempR = temp + 1;
-					if (temp == M+1) tempR = M;
-					Gforw[temp][j + 1] = Gp[temp] * (LambdB*Gforw[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gforw[tempR][j]);
+			int tempR;
+			for (int temp = 1; temp < r - 2; temp++) {
+				probability(&LambdB, &LambdF, &LambdS, temp, R0);
+				tempR = temp + 1;
+				if (temp == M + 1) tempR = M;
+				Gforw[temp][j + 1] = Gp[temp] * (LambdB*Gforw[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gforw[tempR][j]);
+			//	cout << Gforw[temp][j + 1] << " ";
+			}
+			//cout << endl;
+			for (int temp = r - 2; temp > 0; temp--) {
+				probability(&LambdB, &LambdF, &LambdS, temp, R0);
+				tempR = temp + 1;
+				if (temp == M) tempR = M;
+				Gback[temp][j - 1] = Gp[temp] * (LambdB*Gback[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gback[tempR][j]);
+			//	cout << Gforw[temp][j + 1] << " ";
+			}
+			//cout << endl;
 
-				}
-				for (int temp = r - 2; temp > 0; temp--) {
-					tempR = temp + 1;
-					if (temp == M) tempR = M;
-					Gback[temp][j - 1] = Gp[temp] * (LambdB*Gback[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gback[tempR][j]);
-				}
 
-
-
-		//	}
+			//	}
 		}
-		float q = 1;
+		/*
+		for (int tt = 0; tt < r; tt++) {
+			for (int temp3 = 0; temp3 < N+1; temp3++) {
+				cout << Gback[tt][temp3] << " ";
+			}
+			cout << endl;
+		}
+		*/
+		float q = 0;
 		for (int tempr = 0; tempr < M + 2; tempr++) {
-			q *= NumbCell(i, R0);
 			float tempSumm = 0;
 			for (int temps = 0; temps < N + 1; temps++) {
 				tempSumm += (Gforw[tempr][temps] * Gback[tempr][temps]) / Gp[tempr];
 			}
-			q *= tempSumm;
+			tempSumm *= NumbCell(tempr, R0);
+			q += tempSumm;
 		}
+	//	cout << q;
 		for (int tempr = 0; tempr < M + 2; tempr++) {
 			float tempSumm = 0;
 			for (int temps = 0; temps < N + 1; temps++) {
@@ -122,6 +135,7 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 			}
 			phiP[tempr] = (numblink / q)*tempSumm;
 			phiW[tempr] = Gw[tempr];
+			cout << phiP[tempr] << " " << phiW[tempr];
 		}
 
 		for (int tempr = 0; tempr < r; tempr++)
@@ -130,10 +144,21 @@ void field(int numblink, int M, int N, float R0, int max_step, float n, float de
 		for (int tempr = 0; tempr < r; tempr++) {
 			uP[tempr] = alpha[tempr];
 			uW[tempr] = alpha[tempr];
+		//	cout << uP[tempr] << " " << uW[tempr];
 		}
 		for (int tempr = 0; tempr < r; tempr++) {
+			output(tempr, phiW, phiP,alpha);
 			err += pow(phiP[tempr] + phiW[tempr] - 1, 2);
 		}
+		//радиус инерции
+		for (int tempr = 0; tempr < r; tempr++) {
+			multy1 += phiP[tempr] * NumbCell(tempr, R0)*pow(tempr, 2);
+			multy2 += phiP[tempr] * NumbCell(tempr, R0);
+		}
+		Rg = sqrt(multy1 / multy2);
+		cout << "радиус инерцции:" << Rg;
+		Fel = (-numblink / N)*log(numblink / q);
+
 		if (sqrt(err) < del) break;
 	}
 
@@ -163,31 +188,3 @@ int main()
 
 
 
-
-
-
-/*
-/*Gp = exp(-uP[k]);
-Gw = exp(-uW[k]);
-if (k == 0) {
-Gforw[k][j] = 0;
-Gback[k][j] = 0;
-}
-else if (k == M + 1) {
-Gforw[k][j] = Gforw[k - 1][j];
-Gback[k][j] = Gback[k - 1][j];
-}
-else {
-Gforw[k][j] = Gp;
-Gback[k][N - j] = Gw;
-Gforw[k + 1][j] = exp(-uP[k + 1]);
-Gback[k + 1][N - j] = exp(-uW[k + 1]);
-}
-Gforw[k][j + 1] = Gp*(LambdB*Gforw[k - 1][j] + LambdS*Gforw[k][j] + LambdF*Gforw[k + 1][j]);
-Gforw[k][j - 1] = Gp*(LambdB*Gback[k - 1][j] + LambdS*Gforw[k][j] + LambdF*Gback[k + 1][j]);
-
-if (k == M + 1) {
-Gforw[k][j] = Gforw[k - 1][j];
-Gback[k][j] = Gback[k - 1][j];
-}
-*/
