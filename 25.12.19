@@ -1,0 +1,213 @@
+#include "stdafx.h"
+#include <iostream>
+#include <math.h>
+#include <iomanip>
+#include <fstream> 
+#include <stdio.h>
+#include <cstdlib>
+#include <vector>
+
+using namespace std;
+double PI = 3.14159265358979323846;
+//поверхность контактов(A)
+double ContactSurf(int r, double R0) {
+	return 4 * PI*pow((r + R0), 2);
+}
+//число ячеек в слое L
+double NumbCell(int r, double R0) {
+	double Lr;
+	if (r >= 1) {
+		Lr = 4.0 / 3.0 * PI*(3 * pow((r + R0), 2) - 3 * (r + R0) + 1);
+	}
+	else Lr = 4.0 / 3.0 * PI*pow((r + R0), 3);
+	return Lr;
+}
+
+void probability(double* LambdB, double* LambdF, double* LambdS, int curru, double R0) {
+	double tempLambdB, tempLambdF, tempLambdS;
+	tempLambdF = 1.0 / 6;
+	tempLambdB = 1.0 / 6;
+	tempLambdS = 1 - tempLambdB - tempLambdF;//вероятности перехода в плойской геометрии
+	*LambdF = tempLambdF*(ContactSurf(curru, R0) / NumbCell(curru, R0));
+	*LambdB = tempLambdB*(ContactSurf(curru - 1, R0) / NumbCell(curru, R0));
+	*LambdS = 1 - *LambdF - *LambdB;
+}
+
+void output(int r, vector<double>& phiW, vector<double>& phiP, vector<double>&alpha) {
+	FILE *hfile;
+	if (r == 0) {
+		hfile = fopen("out.txt", "w");
+	}
+	else {
+		hfile = fopen("out.txt", "a");
+	}
+
+	fprintf(hfile, " %4d %8.3e %8.3e %8.3e \n", r, phiP[r], phiW[r], alpha[r]);
+	fclose(hfile);
+}
+
+
+
+
+
+void field(int numblink, int M, int N, double R0, int max_step, double v, double del) {
+	double LambdB, LambdF, LambdS, err = 0, F, multy1 = 0, multy2 = 0, Rg, Fel, Fint = 0,q=0;//вероятности перехода в сферической геометрии
+	int curru = 0, currs = 1;
+	int r = M + 2;
+	int allS = N + 1;
+	vector<double> uW;//поле полимера
+	vector<double> uP;//поле растворителя
+	vector<double> phiP;
+	vector<double> phiW;
+	vector<double> alpha;
+	uW.resize(M + 2);
+	alpha.resize(M + 2);
+	uP.resize(M + 2);
+	phiP.resize(M + 2);
+	phiW.resize(M + 2);
+	for (int i = 0; i < M + 2; i++) {
+		uW[i] = 0;
+		alpha[i] = 0;
+		uP[i] = 0;
+	}
+	
+	//vector<double> Gforw{ 0,0,0 };
+	vector < vector <double> > Gforw(M + 2, vector <double>(N + 1, 0));
+	vector < vector <double> > Gback(M + 2, vector <double>(N + 1, 0));
+	vector<double> Gp;//Вероятность нахождения 
+	vector<double> Gw;//в слое
+	Gp.resize(M + 2);
+	Gw.resize(M + 2);
+
+	for (int i = 0; i < max_step; i++) {
+		for (int c = 0; c < r; c++) {
+			Gp[c] = exp(-uP[c]);
+			Gw[c] = exp(-uW[c]);
+
+			//cout << c << -uW[c] << " " << Gw[c] << endl;
+		}
+
+
+		for (int c = 0; c < r; c++) {
+			Gback[c][allS - 1] = Gp[c];
+			Gforw[c][1] = 0.0;
+		}
+		Gforw[1][1] = Gp[1];//начальное положение шарика
+
+		for (int j = 1; j < N; j++) {
+
+			Gforw[0][j] = 0;
+			Gback[0][j] = 0;
+			//for (int k = 1; k < r-1; k++) {
+			int tempR;
+			//вероятность шарика в других слоях
+			for (int temp = 1; temp < r - 1; temp++) {
+				probability(&LambdB, &LambdF, &LambdS, temp, R0);
+				tempR = temp + 1;
+				if (temp == M) tempR = M;
+				Gforw[temp][j + 1] = Gp[temp] * (LambdB*Gforw[temp - 1][j] + LambdS*Gforw[temp][j] + LambdF*Gforw[tempR][j]);
+				//	cout << Gforw[temp][j + 1] << " ";
+			}
+			//cout << endl;
+			for (int temp = N; temp > 1; temp--) {
+				probability(&LambdB, &LambdF, &LambdS, temp, R0);
+				tempR = temp + 1;
+				if (temp == M) tempR = M;
+				Gback[temp][j - 1] = Gp[temp] * (LambdB*Gback[temp - 1][j] + LambdS*Gback[temp][j] + LambdF*Gback[tempR][j]);
+				//	cout << Gforw[temp][j + 1] << " ";
+			}
+			//cout << endl;
+
+
+			//	}
+		}
+		
+		//ищем стат.сумму цепи
+		for (int tempr = 1; tempr < M + 1; tempr++) {
+			double tempSumm = 0;
+			for (int temps = 1; temps < N + 1; temps++) {
+				tempSumm += (Gforw[tempr][temps] * Gback[tempr][temps]) / Gp[tempr];
+			}
+			tempSumm *= NumbCell(tempr, R0);
+			q += tempSumm;
+		}
+		//	cout << q;
+		//Рассчитываем профили плотности полимера и растворителя
+		for (int tempr = 1; tempr < M + 1; tempr++) {
+			double tempSumm = 0;
+			for (int temps = 1; temps < N + 1; temps++) {
+				tempSumm += (Gforw[tempr][temps] * Gback[tempr][temps]) / Gp[tempr];
+			}
+			phiP[tempr] = (numblink / q)*tempSumm;
+			phiW[tempr] = Gw[tempr];
+			//cout << Gw[tempr] << " " << phiW[tempr] << endl;
+		}
+		//Рассчитываем поле Лагранжа
+		for (int tempr = 1; tempr < r - 1; tempr++)
+			alpha[tempr] = alpha[tempr] + v*(phiP[tempr] + phiW[tempr] - 1);
+		//обновляем поля
+		for (int tempr = 1; tempr < r; tempr++) {
+			uP[tempr] = alpha[tempr];
+			uW[tempr] = alpha[tempr];
+			//	cout << uP[tempr] << " " << uW[tempr];
+		}
+		//условие выхода из цикла
+		err = 0;
+		for (int tempr = 1; tempr < r - 1; tempr++) {
+			//output(tempr, phiW, phiP, alpha);
+			err += pow(phiP[tempr] + phiW[tempr] - 1, 2);
+		}
+	//	printf("iter = %7d, deviation: %8.3e\n", i, err);
+
+		//радиус инерции
+		/*
+		for (int tempr = 0; tempr < r; tempr++) {
+		multy1 += phiP[tempr] * NumbCell(tempr, R0)*pow(tempr, 2);
+		multy2 += phiP[tempr] * NumbCell(tempr, R0);
+		}
+		Rg = sqrt(multy1 / multy2);
+		
+		//cout << "radius iner:" << Rg << "  ";
+		//ищем Cвободную энергию
+		Fel = (-numblink / N)*log(numblink / q);
+		for (int tempr = 0; tempr < r; tempr++) {
+		Fint += (uP[tempr] * phiP[tempr] + uW[tempr] * phiW[tempr])* NumbCell(tempr, R0);
+		}
+
+		//cout << "free energy:" << Fel - Fint << endl;
+		*/
+		
+		if (sqrt(err) < del) 
+			break;
+		
+
+	}
+	Fel = (-numblink / N)*log(numblink / q);
+	//ищем радиус инерции и свободную энергию
+	for (int tempr = 0; tempr < r; tempr++) {
+		multy1 += phiP[tempr] * NumbCell(tempr, R0)*pow(tempr, 2);
+		Fint += (uP[tempr] * phiP[tempr] + uW[tempr] * phiW[tempr])* NumbCell(tempr, R0);
+		multy2 += phiP[tempr] * NumbCell(tempr, R0);
+		output(tempr, phiW, phiP, alpha);//вывод системы в файл
+	}
+	Rg = sqrt(multy1 / multy2);
+	cout << "radius iner:" << Rg << "  ";
+	cout << "free energy:" << Fel - Fint << endl;
+}
+
+
+
+
+
+int main()
+{
+	//setlocale(LC_ALL, "Russian");
+	int N, n, M, max_step, numblink;
+	double del = 0.1, R0 = 0.5, v;
+	ifstream infile("data1.txt");
+	infile >> N >> n >> M >> v >> del >> max_step;//нач. парамертры
+	infile.close();
+	numblink = n*N;//число звеньев
+	field(numblink, M, N, R0, max_step, v, del);
+	return 0;
+}
